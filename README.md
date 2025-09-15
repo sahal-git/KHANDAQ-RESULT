@@ -18,7 +18,7 @@ Changes made via Lovable will be committed automatically to this repo.
 
 If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+The only requirement is having Node.js & Yarn installed.
 
 Follow these steps:
 
@@ -30,10 +30,10 @@ git clone <YOUR_GIT_URL>
 cd <YOUR_PROJECT_NAME>
 
 # Step 3: Install the necessary dependencies.
-npm i
+yarn install
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+yarn dev
 ```
 
 **Edit a file directly in GitHub**
@@ -59,10 +59,29 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase
 
 ## How can I deploy this project?
 
+### Using Lovable (Recommended)
+
 Simply open [Lovable](https://lovable.dev/projects/e80dc676-400c-420e-9380-2b478222665c) and click on Share -> Publish.
+
+### Manual Deployment to Netlify
+
+If you prefer to deploy the project manually to a service like Netlify, use the following settings:
+
+#### Build Settings
+- **Build Command:** `yarn build`
+- **Publish Directory:** `dist`
+
+#### Environment Variables
+You will need to configure the following environment variables in your Netlify site settings (under "Site configuration" > "Build & deploy" > "Environment"):
+
+- `VITE_SUPABASE_URL`: Your Supabase project URL.
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase project anon key.
+
+You can find these values in your Supabase project dashboard.
 
 ## Can I connect a custom domain to my Lovable project?
 
