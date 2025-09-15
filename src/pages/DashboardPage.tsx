@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { fireConfetti } from '@/lib/confetti';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
 
 const StatItem = ({ label, value }: { label: string, value: string | number }) => (
     <div className="flex flex-col items-center justify-center p-2 text-center">
@@ -44,7 +45,9 @@ const DashboardPage = () => {
       setPublishedPrograms(data.map(p => p.program_code));
     }
     if (error) {
-        console.error("Error fetching published programs:", error.message);
+        toast.error("Error fetching published programs", {
+          description: error.message,
+        });
     }
     setLoadingPublished(false);
   };

@@ -69,11 +69,9 @@ Simply open [Lovable](https://lovable.dev/projects/e80dc676-400c-420e-9380-2b478
 
 ### Manual Deployment to Netlify
 
-If you prefer to deploy the project manually to a service like Netlify, use the following settings:
+If you prefer to deploy the project manually to Netlify, the required build and redirect settings are already configured in the `netlify.toml` file. This ensures that client-side routes like `/admin` work correctly in production.
 
-#### Build Settings
-- **Build Command:** `yarn build`
-- **Publish Directory:** `dist`
+You only need to configure the environment variables for your Supabase project.
 
 #### Environment Variables
 You will need to configure the following environment variables in your Netlify site settings (under "Site configuration" > "Build & deploy" > "Environment"):
