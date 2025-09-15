@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useResultsData, ResultEntry } from '@/hooks/useResultsData';
 import { FilterControls } from '@/components/FilterControls';
 import { ResultCard } from '@/components/ResultCard';
@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { fireConfetti } from '@/lib/confetti';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/lib/supabaseClient';
 
 const StatItem = ({ label, value }: { label: string, value: string | number }) => (
     <div className="flex flex-col items-center justify-center p-2 text-center">
@@ -24,11 +25,38 @@ const DashboardPage = () => {
   const webappUrl = 'https://script.google.com/macros/s/AKfycbzYuQKwLM-z4iT8qemGv3r2HLGjDK-fiH6Hs04JbUkhrXsVAi4hB30VjTHml68FNFj6aA/exec';
   
   const { data, loading, error, refetch } = useResultsData({ webappUrl });
+  const [publishedPrograms, setPublishedPrograms] = useState<string[]>([]);
+  const [loadingPublished, setLoadingPublished] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedTeam, setSelectedTeam] = useState('all');
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const fetchPublishedPrograms = async () => {
+    setLoadingPublished(true);
+    const { data, error } = await supabase
+      .from('program_status')
+      .select('program_code')
+      .eq('is_published', true);
+
+    if (data) {
+      setPublishedPrograms(data.map(p => p.program_code));
+    }
+    if (error) {
+        console.error("Error fetching published programs:", error.message);
+    }
+    setLoadingPublished(false);
+  };
+
+  useEffect(() => {
+    fetchPublishedPrograms();
+  }, []);
+
+  const handleRefresh = () => {
+    refetch();
+    fetchPublishedPrograms();
+  };
 
   const { categories, teams } = useMemo(() => {
     const defaultTeams = ['AR: ALMARIA', 'TD: TOLIDO', 'ZR: ZARAGOZA'];
@@ -40,12 +68,12 @@ const DashboardPage = () => {
     };
   }, []);
 
-  const hasAnyPublishedResults = useMemo(() => {
-    return data.some(entry => entry.status && entry.status.toLowerCase() === 'published');
-  }, [data]);
+  const publicData = useMemo(() => {
+    return data.filter(entry => publishedPrograms.includes(entry.programCode));
+  }, [data, publishedPrograms]);
 
   const filteredData = useMemo(() => {
-    return data.filter(entry => {
+    return publicData.filter(entry => {
       const matchesSearch = !searchTerm || 
         entry.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         entry.teamCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -57,7 +85,7 @@ const DashboardPage = () => {
       
       return matchesSearch && matchesCategory && matchesTeam;
     });
-  }, [data, searchTerm, selectedCategory, selectedTeam]);
+  }, [publicData, searchTerm, selectedCategory, selectedTeam]);
 
   const groupedData = useMemo(() => {
     const groups: Record<string, ResultEntry[]> = {};
@@ -72,21 +100,9 @@ const DashboardPage = () => {
       groups[key].push(entry);
     });
     
-    // Filter groups to only include those with at least one "Published" status
-    const filteredGroups: Record<string, ResultEntry[]> = {};
-    Object.entries(groups).forEach(([key, entries]) => {
-      const hasPublishedStatus = entries.some(entry => 
-        entry.status && entry.status.toLowerCase() === 'published'
-      );
-      if (hasPublishedStatus) {
-        filteredGroups[key] = entries;
-      }
-    });
-    
     const allProgramCodes = new Set(data.map(item => item.programCode).filter(Boolean));
 
-    // Sort the filtered groups by the latest entry (assuming later entries are more recent)
-    const sortedGroupEntries = Object.entries(filteredGroups).sort((a, b) => {
+    const sortedGroupEntries = Object.entries(groups).sort((a, b) => {
       const getLatestIndex = (entries: ResultEntry[]) => {
         return Math.max(...entries.map(entry => 
           data.findIndex(dataEntry => 
@@ -100,7 +116,6 @@ const DashboardPage = () => {
       const latestIndexA = getLatestIndex(a[1]);
       const latestIndexB = getLatestIndex(b[1]);
       
-      // Sort in descending order (latest entries first)
       return latestIndexB - latestIndexA;
     });
 
@@ -114,8 +129,10 @@ const DashboardPage = () => {
     };
   }, [filteredData, data]);
 
+  const isLoading = loading || loadingPublished;
+
   const renderResultsGrid = () => {
-    if (loading) {
+    if (isLoading) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {[...Array(9)].map((_, i) => <ResultCardSkeleton key={i} />)}
@@ -124,14 +141,14 @@ const DashboardPage = () => {
     }
 
     if (error) {
-      return <ErrorMessage message={error} onRetry={refetch} />;
+      return <ErrorMessage message={error} onRetry={handleRefresh} />;
     }
 
-    if (data.length === 0 && !loading) {
+    if (publicData.length === 0 && !isLoading) {
       return (
         <div className="text-center py-16 rounded-lg border border-dashed">
             <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No results available yet</h3>
+            <h3 className="text-xl font-semibold mb-2">No results published yet</h3>
             <p className="text-muted-foreground mb-4">The celebration is about to begin! Check back soon.</p>
         </div>
       );
@@ -154,16 +171,6 @@ const DashboardPage = () => {
                 })}
             </div>
         )
-    }
-
-    if (!hasAnyPublishedResults) {
-      return (
-        <div className="text-center py-16 rounded-lg border border-dashed">
-            <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No Results Published Yet</h3>
-            <p className="text-muted-foreground mb-4">The celebration is about to begin! Results are being tallied.</p>
-        </div>
-      );
     }
 
     return (
@@ -199,8 +206,8 @@ const DashboardPage = () => {
             <span className="text-lg font-bold">KHANDAQ '25</span>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">
-            <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
             </Button>
             <ThemeToggle />
@@ -220,12 +227,12 @@ const DashboardPage = () => {
 
         <section className="container pb-16">
             <div className="space-y-8">
-                {!loading && !error && data.length > 0 && (
+                {!isLoading && !error && publicData.length > 0 && (
                     <Card>
                         <CardContent className="p-4 space-y-4">
                             <div className="grid grid-cols-3 divide-x divide-border">
-                                <StatItem label="Programs" value={groupedData.uniqueProgramCount} />
-                                <StatItem label="Entries" value={data.length} />
+                                <StatItem label="Programs" value={publishedPrograms.length} />
+                                <StatItem label="Entries" value={publicData.length} />
                                 <StatItem label="Teams" value={teams.length} />
                             </div>
                             <Separator />
@@ -269,12 +276,11 @@ const DashboardPage = () => {
           </div>
       </footer>
 
-      {/* Floating Action Button */}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             onClick={fireConfetti}
-            disabled={loading}
+            disabled={isLoading}
             className="fixed bottom-8 right-8 z-50 h-16 w-16 rounded-full shadow-lg bg-gradient-primary text-primary-foreground transition-transform hover:scale-110 active:scale-100"
             size="icon"
           >
